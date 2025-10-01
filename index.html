@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚽ 足球预测系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <div class="max-w-4xl mx-auto p-6">
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h1 class="text-3xl font-bold text-gray-800">
+                <span class="text-4xl">⚽</span> 足球预测系统
+            </h1>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">比赛预测</h2>
+            
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">主队</label>
+                    <input type="text" id="homeTeam" value="Manchester City" 
+                           class="w-full px-4 py-3 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">客队</label>
+                    <input type="text" id="awayTeam" value="Arsenal" 
+                           class="w-full px-4 py-3 border rounded-lg">
+                </div>
+            </div>
+
+            <button onclick="fetchOdds()" 
+                    class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg mb-4">
+                🌐 自动获取赔率
+            </button>
+
+            <div id="oddsDisplay" class="hidden mb-4 p-4 bg-blue-50 rounded-lg">
+                <h3 class="font-bold mb-2">多平台赔率</h3>
+                <div id="oddsContent"></div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-2">主胜赔率</label>
+                    <input type="number" id="homeOdds" value="1.75" step="0.01"
+                           class="w-full px-4 py-3 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2">平局赔率</label>
+                    <input type="number" id="drawOdds" value="3.80" step="0.01"
+                           class="w-full px-4 py-3 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2">客胜赔率</label>
+                    <input type="number" id="awayOdds" value="4.50" step="0.01"
+                           class="w-full px-4 py-3 border rounded-lg">
+                </div>
+            </div>
+
+            <button onclick="predict()" 
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-lg">
+                🎯 开始预测
+            </button>
+
+            <div id="results" class="hidden mt-6 pt-6 border-t"></div>
+        </div>
+    </div>
+
+    <script>
+        // 获取赔率
+        async function fetchOdds() {
+            const homeTeam = document.getElementById('homeTeam').value;
+            const awayTeam = document.getElementById('awayTeam').value;
+            
+            document.getElementById('oddsDisplay').classList.remove('hidden');
+            document.getElementById('oddsContent').innerHTML = '⏳ 获取中...';
+
+            try {
+                const response = await fetch(`/api/odds?home=${encodeURIComponent(homeTeam)}&away=${encodeURIComponent(awayTeam)}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    document.getElementById('oddsContent').innerHTML = `❌ ${data.error}`;
+                    return;
+                }
+
+                // 显示赔率
+                let html = '<div class="space-y-2">';
+                data.forEach(match => {
+                    match.bookmakers.forEach(bookmaker => {
+                        const h2h = bookmaker.markets.find(m => m.key === 'h2h');
+                        if (h2h) {
+                            const home = h2h.outcomes.find(o => o.name === homeTeam)?.price || 'N/A';
+                            const draw = h2h.outcomes.find(o => o.name === 'Draw')?.price || 'N/A';
+                            const away = h2h.outcomes.find(o => o.name === awayTeam)?.price || 'N/A';
+                            
+                            html += `
+                                <div class="bg-white p-3 rounded">
+                                    <div class="font-semibold">${bookmaker.title}</div>
+                                    <div class="text-sm grid grid-cols-3 gap-2 mt-1">
+                                        <span>主: ${home}</span>
+                                        <span>平: ${draw}</span>
+                                        <span>客: ${away}</span>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    });
+                });
+                html += '</div>';
+                
+                document.getElementById('oddsContent').innerHTML = html;
+                
+                // 自动填充第一个平台的赔率
+                if (data[0]?.bookmakers[0]) {
+                    const h2h = data[0].bookmakers[0].markets.find(m => m.key === 'h2h');
+                    if (h2h) {
+                        document.getElementById('homeOdds').value = h2h.outcomes[0].price;
+                        document.getElementById('drawOdds').value = h2h.outcomes.find(o => o.name === 'Draw')?.price || 3.5;
+                        document.getElementById('awayOdds').value = h2h.outcomes[2].price;
+                    }
+                }
+
+            } catch (error) {
+                document.getElementById('oddsContent').innerHTML = `❌ 获取失败: ${error.message}`;
+            }
+        }
+
+        // 预测函数
+        function predict() {
+            const homeTeam = document.getElementById('homeTeam').value;
+            const awayTeam = document.getElementById('awayTeam').value;
+            const homeOdds = parseFloat(document.getElementById('homeOdds').value);
+            const drawOdds = parseFloat(document.getElementById('drawOdds').value);
+            const awayOdds = parseFloat(document.getElementById('awayOdds').value);
+
+            // 简化的预测计算
+            const homeProb = 0.5;
+            const drawProb = 0.25;
+            const awayProb = 0.25;
+
+            const homeEdge = homeProb - (1/homeOdds);
+            const drawEdge = drawProb - (1/drawOdds);
+            const awayEdge = awayProb - (1/awayOdds);
+
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('results').innerHTML = `
+                <h3 class="text-xl font-bold mb-4">预测结果</h3>
+                
+                <div class="grid grid-cols-3 gap-4 mb-4">
+                    <div class="bg-green-50 rounded-lg p-4 text-center">
+                        <div class="text-sm text-gray-600">主胜概率</div>
+                        <div class="text-3xl font-bold text-green-600">${(homeProb * 100).toFixed(1)}%</div>
+                    </div>
+                    <div class="bg-yellow-50 rounded-lg p-4 text-center">
+                        <div class="text-sm text-gray-600">平局概率</div>
+                        <div class="text-3xl font-bold text-yellow-600">${(drawProb * 100).toFixed(1)}%</div>
+                    </div>
+                    <div class="bg-red-50 rounded-lg p-4 text-center">
+                        <div class="text-sm text-gray-600">客胜概率</div>
+                        <div class="text-3xl font-bold text-red-600">${(awayProb * 100).toFixed(1)}%</div>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <div class="border rounded-lg p-4 ${homeEdge > 0.05 ? 'bg-green-50 border-green-300' : ''}">
+                        <div class="flex justify-between items-center">
+                            <span class="font-semibold">主胜</span>
+                            <span class="${homeEdge > 0 ? 'text-green-600' : 'text-red-600'} font-bold">
+                                期望值: ${(homeEdge * 100).toFixed(1)}%
+                            </span>
+                        </div>
+                    </div>
+                    <div class="border rounded-lg p-4">
+                        <div class="flex justify-between items-center">
+                            <span class="font-semibold">平局</span>
+                            <span class="${drawEdge > 0 ? 'text-green-600' : 'text-red-600'} font-bold">
+                                期望值: ${(drawEdge * 100).toFixed(1)}%
+                            </span>
+                        </div>
+                    </div>
+                    <div class="border rounded-lg p-4">
+                        <div class="flex justify-between items-center">
+                            <span class="font-semibold">客胜</span>
+                            <span class="${awayEdge > 0 ? 'text-green-600' : 'text-red-600'} font-bold">
+                                期望值

@@ -1,0 +1,22 @@
+{
+  "name": "football-predictor",
+  "version": "1.0.0",
+  "description": "足球预测系统 - AI驱动的价值投注分析工具",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'No build needed'",
+    "deploy": "vercel --prod"
+  },
+  "keywords": [
+    "football",
+    "prediction",
+    "betting",
+    "odds",
+    "analytics"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {}
+}
